@@ -22,7 +22,7 @@ def get_titles(url):
         titl[i+1] = tags[i].contents[0]
     return titl
 
-#titles = get_titles(url)
+#titles = get_titles(url1)
 #print titles
 
 def get_intros(url):
@@ -37,7 +37,7 @@ def get_intros(url):
         intr[i+1] = tags[i].contents[0].strip()
     return intr
 
-#intros = get_intros(url)
+#intros = get_intros(url1)
 #print intros
 
 def download_pdf(url):  

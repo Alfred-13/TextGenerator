@@ -1,3 +1,4 @@
+import os, sys
 from pdfminer.pdfparser import PDFParser
 from pdfminer.pdfdocument import PDFDocument
 from pdfminer.pdfpage import PDFPage
@@ -11,7 +12,7 @@ from pdfminer.converter import PDFPageAggregator
 
 
 def pdf_to_txt(in_file):
-	""" turn a PDF file to a TXT file roughly
+	""" turn a PDF file to a TXT file (roughly processed)
 	"""
 	# Open a PDF file.
 	fp = open(in_file, 'rb')
@@ -40,3 +41,26 @@ def pdf_to_txt(in_file):
 				with open(out_file, 'a') as dst_file:
 					text = klass.get_text().encode('utf-8')
 					dst_file.write(text + '\n')
+	return None
+
+def get_all_pdfs():
+	""" return a list containing all PDF filenames in current directory
+	"""
+	pdf_lst = []
+	# Get all files (including directories) in current directory
+	src_lst = os.listdir(os.getcwd())
+	# Select PDF files
+	for fn in src_lst:
+		if (not os.path.isdir(fn)) and fn.endswith('.pdf'):
+			pdf_lst.append(fn)
+	return pdf_lst
+
+def build_all():
+	""" turn all PDF files in current directory to TXT files
+	"""
+	pdf_lst = get_all_pdfs()
+	for fn in pdf_lst:
+		pdf_to_txt(fn)
+	return None
+
+build_all()
