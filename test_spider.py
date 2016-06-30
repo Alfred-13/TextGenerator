@@ -1,7 +1,12 @@
 from urllib2 import *
 from bs4 import BeautifulSoup
 
-url = 'http://www.ieee-security.org/TC/SP2016/program.html'
+# program
+url1 = 'http://www.ieee-security.org/TC/SP2016/program.html'
+# program-papers
+url2 = 'http://www.ieee-security.org/TC/SP2016/program-papers.html'
+# program-posters (pdfs in this url)
+url3 = 'http://www.ieee-security.org/TC/SP2016/program-posters.html'
 
 def get_titles(url):
     """ return a dict containing all titles in one page
