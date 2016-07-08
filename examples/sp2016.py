@@ -23,7 +23,7 @@ def get_titles(url):
 def insert_mysql(year, month, conf_name, papers):
     try:
         tablename='papertitle'
-        conn = MySQLdb.connect(host="127.0.0.1", user="root", passwd="13917331612", db="conference")
+        conn = MySQLdb.connect(host="127.0.0.1", user="root", passwd="******", db="conference")
         c = conn.cursor()
         for p in papers:
             sql = "insert into "+tablename+"(year,month,name,title)  values(%s,%s,%s,%s)"

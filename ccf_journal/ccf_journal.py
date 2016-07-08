@@ -77,6 +77,13 @@ re_year=r'((19|20)\d+)'
 repeato_year=r'([ /-]*'+re_year+r'*)*'
 pattern_year=re_year+repeato_year
 
+# open a log file for potential errors
+#try:
+#	os.remove('error.log')
+#	ferror = open('error.log', 'w+')
+#except:
+#	ferror = open('error.log', 'w+')
+
 
 def get_titles_journal(rec, tag):
 	""" get titles with single <h2> tag and a record (in-place change)
@@ -138,6 +145,8 @@ def get_leaf_urls_journal(clade):
 		return leaves
 		#return tags
 	except Exception, error:
+		#ferror.write(error)
+		#ferror.write('\n')
 		print '!!!! [-]', error,
 		return None
 
@@ -213,6 +222,8 @@ def build_leaves_journal(rec_lst_clades):
 				#rec_lst_leaves.append(copy.deepcopy(rec))
 				rec['titles'] = [] # initialize the titles list
 		except Exception, error:
+			#ferror.write(error)
+			#ferror.write('\n')
 			print '!!!! [-]', error,
 			print '===> Error leaf : %s' %(rec['leaf'])
 			continue
@@ -229,16 +240,30 @@ def incert_mysql(rec):
 		conn = MySQLdb.connect(host='127.0.0.1', user='root', passwd='dcc', db='cs_papers')
 		c = conn.cursor()
 		for p in rec['titles']:
-			sql = "insert into " + tablename + \
-				"(year, month, name, title, class, category) \
+			delete = "delete from " + tablename + ' where title = "%s"' %(p)
+			incert = "insert into " + tablename + " (year, month, name, title, class, category) \
 				values(%s, %s, %s, %s, %s, %s)"
-			param = (rec['year'],rec['month'],rec['name'],p,rec['class'],rec['category'])
-			c.execute(sql, param)
-			print ">>>> [+] Insert paper <%s> : done." %(p)
-		conn.commit()
+			iparam = (rec['year'],rec['month'],rec['name'],p,rec['class'],rec['category'])
+			# try to execute delete
+			try:
+				c.execute(delete)
+				print '>>>> [+] Delete paper <%s> : done.' %(p)
+			except MySQLdb.Error, de:
+				#ferror.write("[-] Mysql Error %d : %s\n" % (de.args[0], de.args[1]))
+				print "!!!! [-] Mysql Error %d : %s" % (de.args[0], de.args[1])
+			# try to execute incert
+			try:
+				c.execute(incert, iparam)
+				print ">>>> [+] Insert paper <%s> : done." %(p)
+			except MySQLdb.Error, ie:
+				#ferror.write("[-] Mysql Error %d : %s\n" % (ie.args[0], ie.args[1]))
+				print "!!!! [-] Mysql Error %d : %s" % (ie.args[0], ie.args[1])
+			# commit for each paper
+			conn.commit()
 		c.close()
 	except MySQLdb.Error, e:
-		print "!!!! [-] Mysql Error %d: %s" % (e.args[0], e.args[1])
+		#ferror.write("[-] Mysql Error %d : %s\n" % (e.args[0], e.args[1]))
+		print "!!!! [-] Mysql Error %d : %s" % (e.args[0], e.args[1])
 	return None
 
 def build_all_category(category):
@@ -258,48 +283,18 @@ def build_all_category(category):
 def build_all():
 	""" build all categories' journal part all
 	"""
-	#build_all_category('system')
-	#build_all_category('network')
-	#build_all_category('security')
-	#build_all_category('softeng')
-	#build_all_category('database')
-	#build_all_category('theory')
-	#build_all_category('multimedia')
-	#build_all_category('AI')
+	build_all_category('system')
+	build_all_category('network')
+	build_all_category('security')
+	build_all_category('softeng')
+	build_all_category('database')
+	build_all_category('theory')
+	build_all_category('multimedia')
+	build_all_category('AI')
 	build_all_category('HCI')
-	#build_all_category('MISC')
+	build_all_category('MISC')
+	#ferror.close()
 	print '[*] All finished.' 
 	return None
 
-
-def task(args):
-	""" threading
-	"""
-	if args == 1:
-		build_all_category('network')
-	elif args == 2:
-		build_all_category('database')
-	elif args == 3:
-		build_all_category('HCI')
-	return None
-
-
-#t1 = Thread(target=task(1))
-#t2 = Thread(target=task(2))
-#t3 = Thread(target=task(3))
-
-#t1.start()
-#t2.start()
-
 build_all()
-#build_root_journal(root_network, 'network')
-#trec = copy.deepcopy(record)
-#trec['leaf'] = 'http://dblp.uni-trier.de/db/journals/jnca/jnca32.html'
-#get_year_journal(trec)
-
-#rec_lst_root_j = build_root_journal(root_network, 'network')
-#rec_lst_clades_j = build_clades_journal(rec_lst_root_j[1:2])
-#rec_lst_leaves_j = build_leaves_journal(rec_lst_clades_j)
-
-#l = get_leaf_urls_journal('http://dblp.uni-trier.de/db/journals/dcc/')
-#print l
