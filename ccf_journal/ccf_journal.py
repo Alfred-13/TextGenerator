@@ -1,18 +1,17 @@
 # -*- coding: utf-8 -*-
 import re
 import copy
-import time # time.sleep
 import random
 import os, sys
 import MySQLdb
 import requests
-import threading
+from time import sleep
+from threading import Thread
 from bs4 import BeautifulSoup
 
 reload(sys)
 sys.setdefaultencoding('utf-8')
-
-requests.adapters.DEFAULT_RETRIES = 5 
+#requests.adapters.DEFAULT_RETRIES = 5 
 
 # pattern to store unit data
 record = {
@@ -44,14 +43,28 @@ months = {
 classes = {1:'A', 2:'B', 3:'C'}
 
 
+root_system = 'http://www.ccf.org.cn/sites/ccf/biaodan.jsp?contentId=2903028135780'
 root_network = 'http://www.ccf.org.cn/sites/ccf/biaodan.jsp?contentId=2903028135856'
+root_security = 'http://www.ccf.org.cn/sites/ccf/biaodan.jsp?contentId=2903940690850'
+root_softeng = 'http://www.ccf.org.cn/sites/ccf/biaodan.jsp?contentId=2903028135775'
 root_database = 'http://www.ccf.org.cn/sites/ccf/biaodan.jsp?contentId=2903940690081'
+root_theory = 'http://www.ccf.org.cn/sites/ccf/biaodan.jsp?contentId=2903940690325'
+root_multimedia = 'http://www.ccf.org.cn/sites/ccf/biaodan.jsp?contentId=2903940690854'
+root_AI = 'http://www.ccf.org.cn/sites/ccf/biaodan.jsp?contentId=2903940690839'
 root_HCI = 'http://www.ccf.org.cn/sites/ccf/biaodan.jsp?contentId=2903940690320'
+root_MISC = 'http://www.ccf.org.cn/sites/ccf/biaodan.jsp?contentId=2903940690316'
 
 root = {
+	'system': root_system,
 	'network': root_network,
+	'security': root_security,
+	'softeng': root_softeng,
 	'database': root_database,
-	'HCI': root_HCI 
+	'theory': root_theory,
+	'multimedia': root_multimedia,
+	'AI': root_AI,
+	'HCI': root_HCI,
+	'MISC': root_MISC 
 }
 
 # regex to match months in <h2> tags
@@ -73,7 +86,7 @@ def get_titles_journal(rec, tag):
 		for title in p.find_all('span', class_='title', itemprop='name'):
 			rec['titles'].append(title.get_text())
 		p = p.next_sibling.next_sibling
-	print '---> [+] Get %d titles for leaf : %s' %(len(rec['titles']), rec['leaf']) 
+	print 'and hit %d titles for leaf : %s' %(len(rec['titles']), rec['leaf']) 
 	return None
 
 
@@ -104,22 +117,29 @@ def get_yymm_journal(rec, tag):
 		rec['month'] = match_obj_mons
 	except:
 		rec['month'] = None
-	print '---> [+] Add year <%s> month <%s> to leaf : %s' %(y, rec['month'], rec['leaf'])
+	print '>>>> [+] Add yymm <%s> <%s>' %(rec['year'], rec['month']),
 	return None
 
 
 def get_leaf_urls_journal(clade):
 	""" return a list containing all leaf-urls in one clade page (journal)
 	"""
-	r = requests.get(clade)
-	if r.status_code == 200:
-		soup = BeautifulSoup(r.text, 'lxml')
 	leaves = [] # list to store leaf-urls
-	# using selector to locate the leaf-urls
-	tags = soup.select('#main > ul > li:nth-child > a')
-	for tag in tags:
-		leaves.append(tag['href'])
-	return leaves
+	try:
+		r = requests.get(clade, timeout=1)
+		if r.status_code == 200:
+			soup = BeautifulSoup(r.content, 'lxml')
+		# using selector to locate the leaf-urls
+		#tags = soup.select('#main > ul > li:nth-child > a')
+		# select the latest papers
+		tags = soup.select('#main > ul > li:nth-child')[0].find_all('a')
+		for tag in tags:
+			leaves.append(tag['href'])
+		return leaves
+		#return tags
+	except Exception, error:
+		print '!!!! [-]', error,
+		return None
 
 
 # category = network, database, HCI, and etc.
@@ -129,7 +149,7 @@ def build_root_journal(root, category):
 	"""
 	r = requests.get(root)
 	if r.status_code == 200:
-		soup = BeautifulSoup(r.text, 'lxml')
+		soup = BeautifulSoup(r.content, 'lxml')
 	rec = copy.deepcopy(record)
 	rec_lst_j = [] # store records for each journal's url in root page
 	rec['category'] = category
@@ -149,7 +169,7 @@ def build_root_journal(root, category):
 			else:
 				rec['name'] = tags_a[j].get_text().strip()
 			rec_lst_j.append(copy.deepcopy(rec))
-			print '---> [+] Add clade url : %s' %(rec['clade'])
+			print '>>>> [+] Add clade url : %s' %(rec['clade'])
 	print '[+] Build <%s> root <journal> : done.' %(category)
  	# return the result in a list
  	return rec_lst_j
@@ -162,11 +182,15 @@ def build_clades_journal(rec_lst_j):
 	rec_lst_clades = []
 	# one rec_lst_j share the same <category>
 	for rec in rec_lst_j:
-		leaves = get_leaf_urls_journal(rec['clade'])
-		for leaf in leaves:
-			rec['leaf'] = leaf
-			rec_lst_clades.append(copy.deepcopy(rec))
-			print '---> [+] Add leaf url : %s' %(leaf)
+		try:
+			leaves = get_leaf_urls_journal(rec['clade'])
+			for leaf in leaves:
+				rec['leaf'] = leaf
+				rec_lst_clades.append(copy.deepcopy(rec))
+				print '>>>> [+] Add leaf url : %s' %(leaf)
+		except Exception, error:
+			print '===> Error clade : %s' %(rec['clade'])
+			continue
 	print '[+] Build <%s> clades <journal> : done.' %(rec['category'])
 	return rec_lst_clades
 
@@ -174,43 +198,47 @@ def build_leaves_journal(rec_lst_clades):
 	""" get month and titles for each record in rec_lst_clades
 	"""
 	# get year, month and titles
-	rec_lst_leaves = []
+	#rec_lst_leaves = []
 	for rec in rec_lst_clades:
 		# diffrent leaves for each record in rec_lst_clades
-		r = requests.get(rec['leaf'])
-		if r.status_code == 200:
-			soup = BeautifulSoup(r.text, 'lxml')
-		tags = soup.find_all('h2')
-		for tag in tags:
-			get_yymm_journal(rec, tag)
-			get_titles_journal(rec, tag)
-			rec_lst_leaves.append(copy.deepcopy(rec))
-			rec['titles'] = [] # initialize the titles list
-	# then incert each record in rec_lst_leaves into mysqldb
-	#for rec in rec_lst_leaves:
-	#	incert_mysql(rec)
+		try:
+			r = requests.get(rec['leaf'], timeout=1)
+			if r.status_code == 200:
+				soup = BeautifulSoup(r.content, 'lxml')
+			tags = soup.find_all('h2')
+			for tag in tags:
+				get_yymm_journal(rec, tag)
+				get_titles_journal(rec, tag)
+				incert_mysql(rec)
+				#rec_lst_leaves.append(copy.deepcopy(rec))
+				rec['titles'] = [] # initialize the titles list
+		except Exception, error:
+			print '!!!! [-]', error,
+			print '===> Error leaf : %s' %(rec['leaf'])
+			continue
 	print '[+] Build <%s> leaves <journal> : done.' %(rec['category'])
-	return rec_lst_leaves
+	# return rec_lst_leaves
+	return None
 
 
 def incert_mysql(rec):
 	""" incert a record's full data into mysqldb
 	"""
 	try:
-		tablename = 'papertitle'
-		conn = MySQLdb.connect(host = "127.0.0.1", user = "root", \
-			passwd = "xxxxxx", db = "conference")
+		tablename = 'titles'
+		conn = MySQLdb.connect(host='127.0.0.1', user='root', passwd='dcc', db='cs_papers')
 		c = conn.cursor()
 		for p in rec['titles']:
 			sql = "insert into " + tablename + \
-				"(year, month, name, title, class, category)  values(%s, %s, %s, %s, %s, %s)"
-			param = (rec['year'], rec['month'], rec['name'], p, rec['class'], rec['category'])
+				"(year, month, name, title, class, category) \
+				values(%s, %s, %s, %s, %s, %s)"
+			param = (rec['year'],rec['month'],rec['name'],p,rec['class'],rec['category'])
 			c.execute(sql, param)
-			print "---> [+] Insert paper <%s> : done." %(p)
+			print ">>>> [+] Insert paper <%s> : done." %(p)
 		conn.commit()
 		c.close()
 	except MySQLdb.Error, e:
-		print "[-] Mysql Error %d: %s" % (e.args[0], e.args[1])
+		print "!!!! [-] Mysql Error %d: %s" % (e.args[0], e.args[1])
 	return None
 
 def build_all_category(category):
@@ -220,19 +248,48 @@ def build_all_category(category):
 		rec_lst_root = build_root_journal(root[category], category)
 		rec_lst_clades = build_clades_journal(rec_lst_root)
 		build_leaves_journal(rec_lst_clades)
-		print '[+] Build category <%s> : done.'
-	except:
-		print '[-] Error when building category <%s>. Program killed.' %(category)
+		print '[+] Build category <%s> : done.' %(category)
+	except Exception, error:
+		print '[-] Error when building category <%s>. Program killed.' %(category),
+		print error
 	return None
+
 
 def build_all():
 	""" build all categories' journal part all
 	"""
-	build_all_category('network')
-	build_all_category('database')
+	#build_all_category('system')
+	#build_all_category('network')
+	#build_all_category('security')
+	#build_all_category('softeng')
+	#build_all_category('database')
+	#build_all_category('theory')
+	#build_all_category('multimedia')
+	#build_all_category('AI')
 	build_all_category('HCI')
-	print '[+] Build all : done.'
+	#build_all_category('MISC')
+	print '[*] All finished.' 
 	return None
+
+
+def task(args):
+	""" threading
+	"""
+	if args == 1:
+		build_all_category('network')
+	elif args == 2:
+		build_all_category('database')
+	elif args == 3:
+		build_all_category('HCI')
+	return None
+
+
+#t1 = Thread(target=task(1))
+#t2 = Thread(target=task(2))
+#t3 = Thread(target=task(3))
+
+#t1.start()
+#t2.start()
 
 build_all()
 #build_root_journal(root_network, 'network')
@@ -240,13 +297,9 @@ build_all()
 #trec['leaf'] = 'http://dblp.uni-trier.de/db/journals/jnca/jnca32.html'
 #get_year_journal(trec)
 
-#rec_lst_root_j = build_root_journal(root_database, 'database')
-#rec_lst_clades_j = build_clades_journal(rec_lst_root_j[13:14])
-#rec_lst_leaves_j = build_leaves_journal(rec_lst_clades_j[-1:])
-#for i in rec_lst_leaves_j:
-#	print i
+#rec_lst_root_j = build_root_journal(root_network, 'network')
+#rec_lst_clades_j = build_clades_journal(rec_lst_root_j[1:2])
+#rec_lst_leaves_j = build_leaves_journal(rec_lst_clades_j)
 
-
-#l = get_leaf_urls_journal('http://dblp.uni-trier.de/db/journals/jasis/')
-#for i in range(len(l)):
-#	print i+1, l[i]
+#l = get_leaf_urls_journal('http://dblp.uni-trier.de/db/journals/dcc/')
+#print l
