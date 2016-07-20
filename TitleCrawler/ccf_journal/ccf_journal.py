@@ -297,4 +297,4 @@ def build_all():
 	print '[*] All finished.' 
 	return None
 
-build_all()
+#build_all()

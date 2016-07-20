@@ -1,3 +1,4 @@
+
 # -*- coding: utf-8 -*-
 import re
 import copy
@@ -13,7 +14,7 @@ reload(sys)
 sys.setdefaultencoding('utf-8')
 
 
-clade = 'http://dblp.uni-trier.de/db/conf/mobicom/'
+clade = 'http://dblp.uni-trier.de/db/conf/wise/'
 
 
 months = {
@@ -101,16 +102,23 @@ def get_titles(leaf):
 
 def incert_mysql(year, month, title_lst):
 	try:
-		tablename = 'titles'
-		conn = MySQLdb.connect(host='127.0.0.1', user='root', passwd='dcc', db='cs_papers')
+		tablename = 'papertitle'
+		conn = MySQLdb.connect(host='127.0.0.1', user='root', passwd='13917331612', db='conference')
 		c = conn.cursor()
+		conn.set_character_set('utf8')
+		c.execute('SET NAMES utf8;')
+		c.execute('SET CHARACTER SET utf8;')
+		c.execute('SET character_set_connection=utf8;')
 		for p in title_lst:
-			sql = "insert into " + tablename + \
-				"(year, month, name, title, class, category) \
-				values(%s, %s, %s, %s, %s, %s)"
-			param = (year, month, 'MOBICOM', p, 'A', 'network')
-			c.execute(sql, param)
-			print ">>>> [+] Insert paper <%s> : done." %(p)
+			try:
+				sql = "insert into " + tablename + "(year, month, name, title, class, category) \
+					values(%s, %s, %s, %s, %s, %s)"
+				param = (year, month, 'WISE', p, 'C', 'database')
+				c.execute(sql, param)
+				print ">>>> [+] Insert paper <%s> : done." %(p)
+			except MySQLdb.Error, e:
+				print "[-] Mysql Error %d: %s" % (e.args[0], e.args[1])
+				continue
 		conn.commit()
 		c.close()
 	except MySQLdb.Error, e:
@@ -119,13 +127,11 @@ def incert_mysql(year, month, title_lst):
 
 
 def build():
+	leaves = get_leaves(clade)
+	for leaf in leaves:
+		title_lst = get_titles(leaf)
+		year, month = get_yymm(leaf)
+		incert_mysql(year, month, title_lst)
+	return None
 
-
-leaves = get_leaves(clade)
-for i in range(len(leaves)):
-	print i+1, leaves[i], '\n'
-	y, m = get_yymm('http://dblp.uni-trier.de/db/conf/mobicom/mobicom2015.html')
-	print y, m
-	ts = get_titles('http://dblp.uni-trier.de/db/conf/mobicom/mobicom2015.html')
-	for t in ts:
-		print t
+build()
