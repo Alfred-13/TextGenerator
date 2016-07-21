@@ -25,9 +25,13 @@ class PaperDownloader(object):
 		if r.status_code == 200:
 			soup = BeautifulSoup(r.content, 'lxml')
 		tag = soup.find('a', class_='pdf-link')
-		url = self.rootpg + tag['href']
-		print '[+] Find download page ==> %s' %(url)
-		print '[+] Get PDF url for <%s>' %(self.title)
+		try:
+			url = self.rootpg + tag['href']
+			print '[+] Find download page ==> %s' %(url)
+			print '[+] Get PDF url for <%s>' %(self.title)
+		except Exception, error:
+			print '[-]', error
+			return None
 		return url
 
 	def download_pdf(self):
